@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正在准备分享...</title>
+    <!-- 引入小红书官方 JS SDK -->
+    <script src="https://fe-static.xhscdn.com/biz-static/goten/xhs-1.0.1.js"></script>
+    <style>
+        /* 简单的页面样式，让提示信息居中显示 */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            text-align: center; 
+            padding-top: 50px; 
+            color: #333;
+        }
+        #status {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        #error {
+            color: #d9534f; /* 红色错误提示 */
+            margin-top: 20px;
+            word-break: break-all;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="status">正在从飞书获取内容并生成签名...</h1>
+    <p id="error"></p>
+
+    <script>
+        // ====================================================================================
+        // ▼▼▼【重要】请将这里的 URL 替换成你自己的腾讯云函数 URL (不包含末尾的 /) ▼▼▼
+        // ====================================================================================
+        const backendApiBaseUrl = 'https://1379932261-i6xdv0ilyt.ap-guangzhou.tencentscf.com';
+
+        // 页面加载后自动执行所有操作
+        window.onload = async () => {
+            const statusElement = document.getElementById('status');
+            const errorElement = document.getElementById('error');
+
+            try {
+                // 1. 从当前页面的 URL 中获取 recordId (例如 ?recordId=recABC123)
+                const params = new URLSearchParams(window.location.search);
+                const recordId = params.get('recordId');
+
+                // 如果URL中没有 recordId，就报错并停止
+                if (!recordId) {
+                    throw new Error("链接无效：URL中缺少 recordId 参数！请检查飞书表格的公式是否正确。");
+                }
+
+                // 2. 拼接完整的后端 API 地址
+                const fullApiUrl = `${backendApiBaseUrl}/get-share-data?recordId=${recordId}`;
+                console.log("正在请求后端地址:", fullApiUrl);
+
+                // 3. 向我们的后端服务请求分享数据
+                const response = await fetch(fullApiUrl);
+                const result = await response.json();
+
+                // 如果后端返回失败信息，就报错并停止
+                if (!result.success) {
+                    throw new Error(result.message || "从后端获取数据失败，请检查云函数日志。");
+                }
+
+                console.log("成功获取分享数据:", result.data);
+
+                // 4. 成功获取数据，直接调用小红书分享
+                statusElement.innerText = "数据获取成功，正在唤起小红书...🚀";
+                
+                const { shareInfo, verifyConfig } = result.data;
+
+                xhs.share({
+                    shareInfo: shareInfo,
+                    verifyConfig: verifyConfig,
+                    fail: (e) => {
+                        console.error('小红书分享失败:', e);
+                        statusElement.innerText = "分享失败";
+                        // 将错误信息显示在页面上，方便排查问题
+                        errorElement.innerText = `调用小红书客户端失败，错误信息：${JSON.stringify(e)}`;
+                    },
+                });
+
+            } catch (error) {
+                console.error('整个流程出错:', error);
+                statusElement.innerText = "出错了！";
+                errorElement.innerText = error.message;
+            }
+        };
+    </script>
+</body>
+</html>
